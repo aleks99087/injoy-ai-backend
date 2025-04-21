@@ -306,10 +306,11 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ❗ Или укажи фронт: ["https://injoy-ten.vercel.app"]
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
+)
 
 @app.post("/chat", response_class=PlainTextResponse)
 async def chat(request: Request):
