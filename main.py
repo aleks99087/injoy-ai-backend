@@ -8,6 +8,8 @@ import os
 from dotenv import load_dotenv
 from langchain.tools import tool
 from fastapi.responses import PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 
 load_dotenv()
 
@@ -301,6 +303,13 @@ agent = initialize_agent(
 
 # 🚀 FastAPI endpoint
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ❗ Или укажи фронт: ["https://injoy-ten.vercel.app"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 
 @app.post("/chat", response_class=PlainTextResponse)
 async def chat(request: Request):
