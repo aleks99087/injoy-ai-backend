@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, Request
 from langchain.agents import initialize_agent, Tool
 from langchain_community.llms import OpenAI  # 🔁 Новый импорт OpenAI (из langchain_community)
@@ -7,9 +6,9 @@ from supabase import create_client
 import os
 from dotenv import load_dotenv
 from langchain.tools import tool
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
+from datetime import datetime
 
 load_dotenv()
 
@@ -21,6 +20,52 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # 🔐 OpenAI
 client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"))  # для embedding
 llm = OpenAI(temperature=0)  # для LangChain GPT
+
+# ✨️ Новый эндпоинт: сохранить сообщение в историю
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+@app.post("/chat-history")
+async def save_message(request: Request):
+    data = await request.json()
+
+    required_fields = ["user_id", "session_id", "role", "message"]
+    for field in required_fields:
+        if field not in data:
+            return JSONResponse(status_code=400, content={"error": f"Missing field: {field}"})
+
+    insert_data = {
+        "user_id": data["user_id"],
+        "session_id": data["session_id"],
+        "role": data["role"],
+        "message": data["message"],
+        "message_type": data.get("message_type", "text"),
+        "raw_gpt_response": data.get("raw_gpt_response"),
+        "created_at": datetime.utcnow().isoformat()
+    }
+
+    supabase.table("chat_history").insert([insert_data]).execute()
+    return {"status": "ok"}
+
+@app.get("/chat-history")
+def get_history(user_id: str, session_id: str):
+    response = supabase.table("chat_history") \
+        .select("role, message, message_type") \
+        .eq("user_id", user_id) \
+        .eq("session_id", session_id) \
+        .order("created_at", desc=True) \
+        .limit(20) \
+        .execute()
+
+    return {"messages": list(reversed(response.data))}
+
 
 # 🎯 Тул: поиск по категориям
 def search_attractions(query: str) -> str:
@@ -299,17 +344,6 @@ agent = initialize_agent(
             "Если инструмент вернул markdown или форматированный текст — оставь его в таком же виде."
         )
     }
-)
-
-# 🚀 FastAPI endpoint
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
 )
 
 @app.post("/chat", response_class=PlainTextResponse)
