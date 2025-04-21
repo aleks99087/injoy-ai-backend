@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from langchain.agents import initialize_agent, Tool
-from langchain_community.llms import OpenAI  # 🔁 Новый импорт OpenAI (из langchain_community)
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
 from openai import OpenAI as OpenAIClient     # 🤖 Для embedding
 from supabase import create_client
 import os
@@ -19,7 +20,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 🔐 OpenAI
 client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"))  # для embedding
-llm = OpenAI(temperature=0)  # для LangChain GPT
+llm = ChatOpenAI(temperature=0.7, model_name="gpt-3.5-turbo")
 
 # ✨️ Новый эндпоинт: сохранить сообщение в историю
 app = FastAPI()
@@ -328,19 +329,22 @@ tools = [
     )
 ]
 
-# 🤖 GPT агент
+# 🧠 Память (на один сеанс)
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+# 🤖 GPT агент с памятью
 agent = initialize_agent(
     tools,
     llm,
-    agent="zero-shot-react-description",
+    agent="chat-conversational-react-description",
     verbose=True,
+    memory=memory,
     agent_kwargs={
         "system_message": (
             "Ты тревел-бот, который помогает людям планировать прогулки, отдых и досуг в городе.\n"
             "Если один из инструментов (Tool) вернул список мест, их описание, адреса, рейтинги и т.д. — "
             "**не переписывай** этот список своими словами.\n"
             "Просто **вставь ответ инструмента в результат как есть**, сохраняя формат, эмодзи, расстояния и порядок.\n"
-            "Не сокращай и не заменяй текст. Это важно для точной передачи информации.\n"
             "Если инструмент вернул markdown или форматированный текст — оставь его в таком же виде."
         )
     }
